@@ -56,7 +56,7 @@ class ComposeContext:
         cmd: list[str] = [docker, "compose"]
         for f in self.compose_files:
             cmd.extend(["-f", str(f)])
-        if self.env_file and self.env_file.exists():
+        if self.env_file and Path(str(self.env_file)).exists():
             cmd.extend(["--env-file", str(self.env_file)])
         if self.project_dir:
             cmd.extend(["--project-directory", str(self.project_dir)])
