@@ -57,7 +57,7 @@ class DevConfig:
 
     workspace_dir: str = ""
     clone_method: str = "https"  # "https" or "ssh"
-    branch: str = "main"
+    branch: str = "master"
     repos: list[str] = field(default_factory=lambda: list(_REPOS))
 
 

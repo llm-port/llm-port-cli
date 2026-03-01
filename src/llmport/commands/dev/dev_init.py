@@ -152,15 +152,15 @@ def _generate_vscode_workspace(workspace: Path) -> None:
 
 
 @dev_group.command("init")
-@click.option("--workspace", "-w", type=click.Path(), default=".", help="Root directory for the workspace.")
+@click.argument("workspace", type=click.Path(), default=".")
 @click.option("--ssh", is_flag=True, help="Clone using SSH instead of HTTPS.")
-@click.option("--branch", "-b", default="main", show_default=True, help="Branch to checkout after cloning.")
+@click.option("--branch", "-b", default="master", show_default=True, help="Branch to checkout after cloning.")
 @click.option("--skip-infra", is_flag=True, help="Skip starting shared infrastructure.")
 @click.option("--skip-deps", is_flag=True, help="Skip installing dependencies.")
 @click.option("--skip-migrations", is_flag=True, help="Skip running database migrations.")
 def dev_init(
-    *,
     workspace: str,
+    *,
     ssh: bool,
     branch: str,
     skip_infra: bool,
