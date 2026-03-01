@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import platform
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -36,7 +37,10 @@ def _launch_terminal(title: str, working_dir: Path, command: str) -> None:
     system = platform.system()
 
     if system == "Windows":
-        # Prefer Windows Terminal, fall back to pwsh
+        # Resolve shell: pwsh (PS7) > powershell (PS5) > cmd
+        shell = _which("pwsh") or _which("powershell") or "cmd"
+        shell_name = os.path.basename(shell).lower()
+
         wt = _which("wt")
         if wt:
             subprocess.Popen(
@@ -44,13 +48,18 @@ def _launch_terminal(title: str, working_dir: Path, command: str) -> None:
                     "wt", "new-tab",
                     "--title", title,
                     "--startingDirectory", str(working_dir),
-                    "pwsh", "-NoExit", "-Command", command,
+                    shell, "-NoExit", "-Command", command,
                 ],
+                creationflags=subprocess.DETACHED_PROCESS,
+            )
+        elif "powershell" in shell_name or "pwsh" in shell_name:
+            subprocess.Popen(
+                [shell, "-NoExit", "-Command", f"Set-Location '{working_dir}'; {command}"],
                 creationflags=subprocess.DETACHED_PROCESS,
             )
         else:
             subprocess.Popen(
-                ["pwsh", "-NoExit", "-Command", f"Set-Location '{working_dir}'; {command}"],
+                [shell, "/k", f"cd /d \"{working_dir}\" && {command}"],
                 creationflags=subprocess.DETACHED_PROCESS,
             )
     elif system == "Darwin":
