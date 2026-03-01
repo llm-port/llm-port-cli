@@ -212,7 +212,7 @@ def dev_init(
     # ── 1. Clone repos ────────────────────────────────────────────
     console.print("\n[bold cyan]Step 1: Cloning repositories…[/bold cyan]")
     clone_method = "ssh" if ssh else "https"
-    results = clone_all_repos(workspace_path, method=clone_method, branch=branch)
+    results = clone_all_repos(list(REPO_DIR_MAP.keys()), target_dir=workspace_path, method=clone_method, branch=branch)
 
     cloned = sum(1 for r in results if r.cloned)
     skipped = sum(1 for r in results if r.skipped)
