@@ -195,8 +195,6 @@ def dev_up(
                 "$env:LLM_PORT_BACKEND_RABBIT_USER='guest'; "
                 "$env:LLM_PORT_BACKEND_RABBIT_PASS='guest'; "
                 "$env:LLM_PORT_BACKEND_RABBIT_VHOST='/'; "
-                "$env:LLM_PORT_BACKEND_REDIS_HOST='localhost'; "
-                "$env:LLM_PORT_BACKEND_REDIS_PORT='6379'; "
             )
             if platform.system() != "Windows":
                 env_prefix = (
@@ -209,9 +207,7 @@ def dev_up(
                     "LLM_PORT_BACKEND_RABBIT_PORT=5672 "
                     "LLM_PORT_BACKEND_RABBIT_USER=guest "
                     "LLM_PORT_BACKEND_RABBIT_PASS=guest "
-                    "LLM_PORT_BACKEND_RABBIT_VHOST=/ "
-                    "LLM_PORT_BACKEND_REDIS_HOST=localhost "
-                    "LLM_PORT_BACKEND_REDIS_PORT=6379; "
+                    "LLM_PORT_BACKEND_RABBIT_VHOST=/; "
                 )
 
             console.print("\n[cyan]Launching backend…[/cyan]")

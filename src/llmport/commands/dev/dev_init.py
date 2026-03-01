@@ -268,8 +268,6 @@ def dev_init(
             "LLM_PORT_BACKEND_RABBIT_USER": "guest",
             "LLM_PORT_BACKEND_RABBIT_PASS": "guest",
             "LLM_PORT_BACKEND_RABBIT_VHOST": "/",
-            "LLM_PORT_BACKEND_REDIS_HOST": "localhost",
-            "LLM_PORT_BACKEND_REDIS_PORT": "6379",
         }
         write_env_file(backend_env_path, backend_env)
         success(f"Backend .env written to {backend_env_path}")
