@@ -32,7 +32,9 @@ _REPOS = [
     "llm-port-rag",
     "llm-port-pii",
     "llm-port-shared",
-    "llm_port_dev",
+    "llm-port-dev",
+    "llm-port-cli",
+    ".github",
 ]
 
 # Map GitHub repo name → local directory name (underscore convention)
@@ -43,7 +45,9 @@ REPO_DIR_MAP: dict[str, str] = {
     "llm-port-rag": "llm_port_rag",
     "llm-port-pii": "llm_port_pii",
     "llm-port-shared": "llm_port_shared",
-    "llm_port_dev": "llm_port_dev",
+    "llm-port-dev": "llm_port_dev",
+    "llm-port-cli": "llm_port_cli",
+    ".github": ".github",
 }
 
 
