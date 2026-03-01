@@ -30,7 +30,61 @@ def _random_secret(length: int = 48) -> str:
     return secrets.token_urlsafe(length)
 
 
-# ── Default values for template rendering ─────────────────────────
+# ── Dev-mode defaults (matching existing shared .env) ─────────────
+
+
+def dev_env_vars(
+    *,
+    profiles: list[str] | None = None,
+) -> dict[str, str]:
+    """Build env vars with standard dev credentials.
+
+    Uses ``devpassword`` everywhere — matches the existing
+    ``llm_port_shared/.env`` used during development.
+    """
+    pw = "devpassword"
+
+    env = {
+        "POSTGRES_USER": "postgres",
+        "POSTGRES_PASSWORD": pw,
+        "POSTGRES_DB": "postgres",
+        "GRAFANA_ADMIN_USER": "admin",
+        "GRAFANA_ADMIN_PASSWORD": pw,
+        "PGADMIN_DEFAULT_EMAIL": "admin@example.com",
+        "PGADMIN_DEFAULT_PASSWORD": pw,
+        "LANGFUSE_NEXTAUTH_SECRET": "dev-langfuse-nextauth-secret",
+        "LANGFUSE_SALT": "dev-langfuse-salt",
+        "LANGFUSE_ENCRYPTION_KEY": "0" * 64,
+        "LANGFUSE_DATABASE_URL": f"postgresql://postgres:{pw}@postgres:5432/langfuse",
+        "CLICKHOUSE_USER": "clickhouse",
+        "CLICKHOUSE_PASSWORD": pw,
+        "CLICKHOUSE_MIGRATION_URL": "clickhouse://clickhouse:9000",
+        "CLICKHOUSE_URL": "http://clickhouse:8123",
+        "REDIS_AUTH": pw,
+        "MINIO_ROOT_USER": "minio",
+        "MINIO_ROOT_PASSWORD": pw,
+        "LANGFUSE_S3_EVENT_UPLOAD_ENDPOINT": "http://minio:9000",
+        "LANGFUSE_S3_MEDIA_UPLOAD_ENDPOINT": "http://minio:9000",
+        "LLM_PORT_API_JWT_SECRET": "dev-jwt-secret-not-for-production",
+        "LLM_PORT_API_LANGFUSE_ENABLED": "false",
+    }
+
+    profs = profiles or []
+    if "rag" in profs:
+        env["LLM_PORT_BACKEND_RAG_ENABLED"] = "true"
+        env["LLM_PORT_API_RAG_ENABLED"] = "true"
+        env["LLM_PORT_API_RAG_SERVICE_URL"] = "http://llm-port-rag:8000"
+    if "pii" in profs:
+        env["LLM_PORT_API_PII_ENABLED"] = "true"
+        env["LLM_PORT_API_PII_SERVICE_URL"] = "http://llm-port-pii:8000"
+    if "auth" in profs:
+        env["LLM_PORT_API_AUTH_ENABLED"] = "true"
+        env["LLM_PORT_API_AUTH_SERVICE_URL"] = "http://llm-port-auth:8000"
+
+    return env
+
+
+# ── Production defaults (random secrets) ──────────────────────────
 
 
 def default_env_vars(

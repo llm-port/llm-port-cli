@@ -16,7 +16,7 @@ import click
 from llmport.core.compose import ComposeContext, up as compose_up
 from llmport.core.console import console, success, warning, error, info
 from llmport.core.detect import detect_docker, check_tool
-from llmport.core.env_gen import default_env_vars, write_env_file
+from llmport.core.env_gen import dev_env_vars, write_env_file
 from llmport.core.git import clone_all_repos
 from llmport.core.settings import (
     DevConfig,
@@ -228,7 +228,7 @@ def dev_init(
     if env_path.exists():
         warning(f".env already exists at {env_path} — skipping.")
     else:
-        env_vars = default_env_vars(profiles=[])
+        env_vars = dev_env_vars(profiles=[])
         write_env_file(env_path, env_vars)
         success(f".env written to {env_path}")
 

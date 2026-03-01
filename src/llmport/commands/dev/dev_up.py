@@ -45,22 +45,21 @@ def _launch_terminal(title: str, working_dir: Path, command: str) -> None:
         if wt:
             subprocess.Popen(
                 [
-                    "wt", "new-tab",
+                    wt, "new-tab",
                     "--title", title,
                     "--startingDirectory", str(working_dir),
                     shell, "-NoExit", "-Command", command,
                 ],
-                creationflags=subprocess.DETACHED_PROCESS,
             )
         elif "powershell" in shell_name or "pwsh" in shell_name:
             subprocess.Popen(
                 [shell, "-NoExit", "-Command", f"Set-Location '{working_dir}'; {command}"],
-                creationflags=subprocess.DETACHED_PROCESS,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
         else:
             subprocess.Popen(
                 [shell, "/k", f"cd /d \"{working_dir}\" && {command}"],
-                creationflags=subprocess.DETACHED_PROCESS,
+                creationflags=subprocess.CREATE_NEW_CONSOLE,
             )
     elif system == "Darwin":
         # macOS: use osascript to open Terminal.app
