@@ -236,7 +236,9 @@ def dev_init(
         error(f"  {r.repo}: {r.error}")
 
     # ── 2. Generate .env ──────────────────────────────────────────
-    console.print("\n[bold cyan]Step 2: Generating .env file…[/bold cyan]")
+    console.print("\n[bold cyan]Step 2: Generating .env files…[/bold cyan]")
+
+    # ── 2a. Shared infrastructure .env ────────────────────────────
     shared_dir = workspace_path / "llm_port_shared"
     env_path = shared_dir / ".env"
     if env_path.exists():
@@ -245,6 +247,32 @@ def dev_init(
         env_vars = dev_env_vars(profiles=[])
         write_env_file(env_path, env_vars)
         success(f".env written to {env_path}")
+
+    # ── 2b. Backend local .env (so uv run uses localhost) ─────────
+    backend_dir = workspace_path / "llm_port_backend"
+    backend_env_path = backend_dir / ".env"
+    if backend_env_path.exists():
+        warning(f"Backend .env already exists at {backend_env_path} — skipping.")
+    elif backend_dir.exists():
+        backend_env = {
+            "LLM_PORT_BACKEND_HOST": "localhost",
+            "LLM_PORT_BACKEND_PORT": "8000",
+            "LLM_PORT_BACKEND_RELOAD": "true",
+            "LLM_PORT_BACKEND_DB_HOST": "localhost",
+            "LLM_PORT_BACKEND_DB_PORT": "5432",
+            "LLM_PORT_BACKEND_DB_USER": "llm_port_backend",
+            "LLM_PORT_BACKEND_DB_PASS": "llm_port_backend",
+            "LLM_PORT_BACKEND_DB_BASE": "llm_port_backend",
+            "LLM_PORT_BACKEND_RABBIT_HOST": "localhost",
+            "LLM_PORT_BACKEND_RABBIT_PORT": "5672",
+            "LLM_PORT_BACKEND_RABBIT_USER": "guest",
+            "LLM_PORT_BACKEND_RABBIT_PASS": "guest",
+            "LLM_PORT_BACKEND_RABBIT_VHOST": "/",
+            "LLM_PORT_BACKEND_REDIS_HOST": "localhost",
+            "LLM_PORT_BACKEND_REDIS_PORT": "6379",
+        }
+        write_env_file(backend_env_path, backend_env)
+        success(f"Backend .env written to {backend_env_path}")
 
     # ── 3. Start shared infrastructure ────────────────────────────
     if not skip_infra:

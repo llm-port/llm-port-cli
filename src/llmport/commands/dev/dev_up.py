@@ -182,11 +182,43 @@ def dev_up(
         if not backend_dir.exists():
             error(f"Backend directory not found: {backend_dir}")
         else:
+            # Env vars so the backend connects to localhost services
+            # instead of Docker-internal hostnames.
+            env_prefix = (
+                "$env:LLM_PORT_BACKEND_DB_HOST='localhost'; "
+                "$env:LLM_PORT_BACKEND_DB_PORT='5432'; "
+                "$env:LLM_PORT_BACKEND_DB_USER='llm_port_backend'; "
+                "$env:LLM_PORT_BACKEND_DB_PASS='llm_port_backend'; "
+                "$env:LLM_PORT_BACKEND_DB_BASE='llm_port_backend'; "
+                "$env:LLM_PORT_BACKEND_RABBIT_HOST='localhost'; "
+                "$env:LLM_PORT_BACKEND_RABBIT_PORT='5672'; "
+                "$env:LLM_PORT_BACKEND_RABBIT_USER='guest'; "
+                "$env:LLM_PORT_BACKEND_RABBIT_PASS='guest'; "
+                "$env:LLM_PORT_BACKEND_RABBIT_VHOST='/'; "
+                "$env:LLM_PORT_BACKEND_REDIS_HOST='localhost'; "
+                "$env:LLM_PORT_BACKEND_REDIS_PORT='6379'; "
+            )
+            if platform.system() != "Windows":
+                env_prefix = (
+                    "export LLM_PORT_BACKEND_DB_HOST=localhost "
+                    "LLM_PORT_BACKEND_DB_PORT=5432 "
+                    "LLM_PORT_BACKEND_DB_USER=llm_port_backend "
+                    "LLM_PORT_BACKEND_DB_PASS=llm_port_backend "
+                    "LLM_PORT_BACKEND_DB_BASE=llm_port_backend "
+                    "LLM_PORT_BACKEND_RABBIT_HOST=localhost "
+                    "LLM_PORT_BACKEND_RABBIT_PORT=5672 "
+                    "LLM_PORT_BACKEND_RABBIT_USER=guest "
+                    "LLM_PORT_BACKEND_RABBIT_PASS=guest "
+                    "LLM_PORT_BACKEND_RABBIT_VHOST=/ "
+                    "LLM_PORT_BACKEND_REDIS_HOST=localhost "
+                    "LLM_PORT_BACKEND_REDIS_PORT=6379; "
+                )
+
             console.print("\n[cyan]Launching backend…[/cyan]")
             _launch_terminal(
                 "Backend – llm-port",
                 backend_dir,
-                "uv run -m llm_port_backend",
+                f"{env_prefix}uv run -m llm_port_backend",
             )
             success("Backend server → http://localhost:8000")
 
@@ -196,7 +228,7 @@ def dev_up(
             _launch_terminal(
                 "Worker – llm-port",
                 backend_dir,
-                "uv run taskiq worker llm_port_backend.tkq:broker llm_port_backend.services.llm.tasks",
+                f"{env_prefix}uv run taskiq worker llm_port_backend.tkq:broker llm_port_backend.services.llm.tasks",
             )
             success("Taskiq worker started.")
 
