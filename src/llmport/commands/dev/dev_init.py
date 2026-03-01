@@ -203,7 +203,7 @@ def dev_init(
         sys.exit(1)
 
     git_check = check_tool("git")
-    if not git_check.installed:
+    if not git_check.found:
         error("Git is required.")
         sys.exit(1)
 

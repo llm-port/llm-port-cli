@@ -97,7 +97,7 @@ def doctor_cmd(ctx: click.Context, *, ports: bool) -> None:
         for tool in report.tools:
             tools_table.add_row(
                 tool.name,
-                _check_mark(tool.installed),
+                _check_mark(tool.found),
                 tool.version or "—",
             )
         console.print(tools_table)
