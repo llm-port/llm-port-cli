@@ -306,6 +306,11 @@ def _generate_vscode_workspace(workspace: Path) -> None:
 @click.option("--skip-infra", is_flag=True, help="Skip starting shared infrastructure.")
 @click.option("--skip-deps", is_flag=True, help="Skip installing dependencies.")
 @click.option("--skip-migrations", is_flag=True, help="Skip running database migrations.")
+@click.option(
+    "--modules",
+    default=None,
+    help="Comma-separated list of modules to enable (e.g. rag,pii,auth).",
+)
 def dev_init(
     workspace: str,
     *,
@@ -315,6 +320,7 @@ def dev_init(
     skip_infra: bool,
     skip_deps: bool,
     skip_migrations: bool,
+    modules: str | None,
 ) -> None:
     """Bootstrap a full llm.port development workspace.
 
@@ -338,8 +344,22 @@ def dev_init(
     workspace_path = Path(workspace).resolve()
     workspace_path.mkdir(parents=True, exist_ok=True)
 
+    # Parse --modules into profile list
+    profiles: list[str] = []
+    if modules:
+        from llmport.commands.module import MODULES
+        for m in modules.split(","):
+            m = m.strip().lower()
+            if m in MODULES:
+                profiles.append(MODULES[m]["profile"])
+            else:
+                warning(f"Unknown module '{m}'. Available: {', '.join(MODULES)}")
+
     console.print(f"\n[bold magenta]llm.port Developer Workspace Setup[/bold magenta]")
-    console.print(f"[dim]Workspace: {workspace_path}[/dim]\n")
+    console.print(f"[dim]Workspace: {workspace_path}[/dim]")
+    if profiles:
+        console.print(f"[dim]Modules:   {', '.join(profiles)}[/dim]")
+    console.print()
 
     # ── Prerequisites ─────────────────────────────────────────────
     console.print("[bold cyan]Checking prerequisites…[/bold cyan]")
@@ -383,7 +403,7 @@ def dev_init(
     if env_path.exists():
         warning(f".env already exists at {env_path} — skipping.")
     else:
-        env_vars = dev_env_vars(profiles=[])
+        env_vars = dev_env_vars(profiles=profiles)
         write_env_file(env_path, env_vars)
         success(f".env written to {env_path}")
 
@@ -481,6 +501,7 @@ def dev_init(
     # ── Save config ───────────────────────────────────────────────
     cfg = load_config()
     cfg.install_dir = str(shared_dir)
+    cfg.profiles = sorted(set(cfg.profiles or []) | set(profiles))
     cfg.dev = DevConfig(
         workspace_dir=str(workspace_path),
         clone_method=clone_method,
