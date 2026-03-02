@@ -69,6 +69,143 @@ def _wait_for_postgres(container: str = "llm-port-postgres", timeout: int = 60) 
     return False
 
 
+def _parse_env_file(path: Path) -> dict[str, str]:
+    """Parse a simple KEY=VALUE env file."""
+    if not path.exists():
+        return {}
+
+    values: dict[str, str] = {}
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        values[key.strip()] = value.strip()
+    return values
+
+
+def _backend_db_creds(backend_dir: Path) -> tuple[str, str, str]:
+    """Resolve backend DB user/password/database from backend .env or defaults."""
+    defaults = ("llm_port_backend", "llm_port_backend", "llm_port_backend")
+    env_values = _parse_env_file(backend_dir / ".env")
+    return (
+        env_values.get("LLM_PORT_BACKEND_DB_USER", defaults[0]),
+        env_values.get("LLM_PORT_BACKEND_DB_PASS", defaults[1]),
+        env_values.get("LLM_PORT_BACKEND_DB_BASE", defaults[2]),
+    )
+
+
+def _ensure_backend_role(backend_dir: Path, pg_user: str = "postgres") -> None:
+    """Ensure backend DB role exists and can migrate the backend database."""
+    db_user, db_pass, db_name = _backend_db_creds(backend_dir)
+    role_lit = db_user.replace("'", "''")
+    pass_lit = db_pass.replace("'", "''")
+    db_lit = db_name.replace("'", "''")
+    role_ident = '"' + db_user.replace('"', '""') + '"'
+
+    create_or_update_role_sql = (
+        "DO $$ "
+        "BEGIN "
+        f"  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '{role_lit}') THEN "
+        f"    CREATE ROLE {role_ident} LOGIN PASSWORD '{pass_lit}'; "
+        "  ELSE "
+        f"    ALTER ROLE {role_ident} WITH LOGIN PASSWORD '{pass_lit}'; "
+        "  END IF; "
+        "END "
+        "$$;"
+    )
+    role_result = subprocess.run(
+        [
+            "docker",
+            "exec",
+            "llm-port-postgres",
+            "psql",
+            "-U",
+            pg_user,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-d",
+            "postgres",
+            "-c",
+            create_or_update_role_sql,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    if role_result.returncode != 0:
+        warning(
+            "Could not ensure backend DB role before migrations:\n"
+            f"{(role_result.stderr or role_result.stdout).strip()}"
+        )
+        return
+
+    grant_db_sql = (
+        f"GRANT CONNECT ON DATABASE \"{db_lit}\" TO {role_ident}; "
+        f"GRANT ALL PRIVILEGES ON DATABASE \"{db_lit}\" TO {role_ident};"
+    )
+    subprocess.run(
+        [
+            "docker",
+            "exec",
+            "llm-port-postgres",
+            "psql",
+            "-U",
+            pg_user,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-d",
+            "postgres",
+            "-c",
+            grant_db_sql,
+        ],
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            "docker",
+            "exec",
+            "llm-port-postgres",
+            "psql",
+            "-U",
+            pg_user,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-d",
+            db_name,
+            "-c",
+            f"GRANT ALL ON SCHEMA public TO {role_ident};",
+        ],
+        capture_output=True,
+        text=True,
+    )
+    subprocess.run(
+        [
+            "docker",
+            "exec",
+            "llm-port-postgres",
+            "psql",
+            "-U",
+            pg_user,
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-d",
+            db_name,
+            "-c",
+            (
+                f"GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO {role_ident}; "
+                f"GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO {role_ident}; "
+                f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
+                f"GRANT ALL PRIVILEGES ON TABLES TO {role_ident}; "
+                f"ALTER DEFAULT PRIVILEGES IN SCHEMA public "
+                f"GRANT ALL PRIVILEGES ON SEQUENCES TO {role_ident};"
+            ),
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+
 def _ensure_database(db_name: str, pg_user: str = "postgres") -> None:
     """Ensure a database exists inside the shared Postgres container."""
     check_sql = f"SELECT 1 FROM pg_database WHERE datname='{db_name}'"
@@ -115,13 +252,15 @@ def _install_frontend_deps(frontend_dir: Path) -> None:
 def _run_migrations(backend_dir: Path) -> None:
     """Run Alembic migrations."""
     console.print("[cyan]Running database migrations…[/cyan]")
+    _ensure_backend_role(backend_dir)
+    db_user, db_pass, db_base = _backend_db_creds(backend_dir)
     env = os.environ.copy()
     # Ensure backend Alembic connects with the right credentials.
     env.setdefault("LLM_PORT_BACKEND_DB_HOST", "localhost")
     env.setdefault("LLM_PORT_BACKEND_DB_PORT", "5432")
-    env.setdefault("LLM_PORT_BACKEND_DB_USER", "llm_port_backend")
-    env.setdefault("LLM_PORT_BACKEND_DB_PASS", "llm_port_backend")
-    env.setdefault("LLM_PORT_BACKEND_DB_BASE", "llm_port_backend")
+    env.setdefault("LLM_PORT_BACKEND_DB_USER", db_user)
+    env.setdefault("LLM_PORT_BACKEND_DB_PASS", db_pass)
+    env.setdefault("LLM_PORT_BACKEND_DB_BASE", db_base)
     result = subprocess.run(["uv", "run", "alembic", "upgrade", "head"], cwd=str(backend_dir), env=env)
     if result.returncode != 0:
         warning("Alembic migration exited with non-zero code.")
@@ -303,6 +442,8 @@ def dev_init(
         console.print("\n[bold cyan]Step 4: Ensuring databases…[/bold cyan]")
         for db_name in ("llm_port_backend", "llm_api", "rag", "pii", "langfuse"):
             _ensure_database(db_name)
+        if backend_dir.exists():
+            _ensure_backend_role(backend_dir)
 
     # ── 5. Install dependencies ───────────────────────────────────
     if not skip_deps:
