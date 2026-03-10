@@ -226,7 +226,17 @@ def deploy_cmd(
 
     from llmport.core.bootstrap import bootstrap_interactive, wait_for_backend  # noqa: PLC0415
 
-    backend_url = "http://localhost:8000"
+    http_port = 80
+    if env_path.exists():
+        try:
+            for line in env_path.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line.startswith("LLM_PORT_HTTP_PORT="):
+                    http_port = int(line.split("=", 1)[1].strip().strip('"').strip("'"))
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+    backend_url = f"http://localhost:{http_port}" if http_port != 80 else "http://localhost"
     console.print("  [dim]Waiting for backend to become healthy…[/dim]")
     if wait_for_backend(backend_url):
         creds = bootstrap_interactive(
@@ -250,26 +260,15 @@ def deploy_cmd(
     table.add_column("Service", style="bold")
     table.add_column("URL")
 
+    base = f"http://localhost:{http_port}" if http_port != 80 else "http://localhost"
     endpoints = [
-        ("Frontend", "http://localhost:5173"),
-        ("Backend API", "http://localhost:8000"),
-        ("Backend Docs", "http://localhost:8000/api/docs"),
-        ("LLM Gateway", "http://localhost:8001"),
-        ("Grafana", "http://localhost:3001"),
-        ("Langfuse", "http://localhost:3002"),
-        ("RabbitMQ Management", "http://localhost:15672"),
+        ("Application", base),
+        ("API Docs", f"{base}/api/docs"),
+        ("OpenAI-compat Gateway", f"{base}/v1/"),
+        ("Grafana", "http://localhost:3001 (local only)"),
+        ("Langfuse", "http://localhost:3002 (local only)"),
+        ("RabbitMQ Management", "http://localhost:15672 (local only)"),
     ]
-
-    if "pii" in profiles:
-        endpoints.append(("PII Service", "http://localhost:8003"))
-    if "rag" in profiles:
-        endpoints.append(("RAG Engine", "http://localhost:8002"))
-    if "auth" in profiles:
-        endpoints.append(("Auth Service", "http://localhost:8005"))
-    if "mailer" in profiles:
-        endpoints.append(("Mailer Service", "http://localhost:8004"))
-    if "docling" in profiles:
-        endpoints.append(("Docling Service", "http://localhost:8006"))
 
     for name, url in endpoints:
         table.add_row(name, url)

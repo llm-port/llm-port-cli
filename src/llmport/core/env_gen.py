@@ -103,7 +103,7 @@ def dev_env_vars(
         "LLM_PORT_BACKEND_SETTINGS_MASTER_KEY": "dev-settings-master-key-change-me",
         "LLM_PORT_API_ENCRYPTION_KEY": "dev-encryption-key-change-me",
         "LLM_PORT_API_LANGFUSE_ENABLED": "false",
-        "LLM_PORT_BACKEND_GATEWAY_URL": "http://llm-port-api:9000",
+        "LLM_PORT_BACKEND_GATEWAY_URL": "http://llm-port-api:8000",
     }
 
     # Scalability tuning (conservative dev defaults)
@@ -159,7 +159,7 @@ def default_env_vars(
         "LLM_PORT_BACKEND_SETTINGS_MASTER_KEY": _random_secret(),
         "LLM_PORT_API_ENCRYPTION_KEY": _random_secret(),
         "LLM_PORT_API_LANGFUSE_ENABLED": "false",
-        "LLM_PORT_BACKEND_GATEWAY_URL": "http://llm-port-api:9000",
+        "LLM_PORT_BACKEND_GATEWAY_URL": "http://llm-port-api:8000",
     }
 
     # Scalability tuning (auto-detect host resources for prod)
