@@ -13,6 +13,7 @@ from llmport.core.settings import load_config
 from llmport.core.sysinfo import (
     ALL_SERVICES,
     DB_SERVICES,
+    DEFAULT_RESOURCE_PCT,
     RABBIT_SERVICES,
     calculate_tune_profile,
     detect_system,
@@ -27,12 +28,19 @@ from llmport.core.sysinfo import (
     help="Tuning profile: dev (conservative) or prod (production-grade).",
 )
 @click.option(
+    "--resource-pct",
+    type=click.FloatRange(0.1, 1.0),
+    default=DEFAULT_RESOURCE_PCT,
+    show_default=True,
+    help="Fraction of host CPU to allocate to the control plane (prod only).",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     default=False,
     help="Show computed values without writing to .env.",
 )
-def tune_cmd(*, profile: str, dry_run: bool) -> None:
+def tune_cmd(*, profile: str, resource_pct: float, dry_run: bool) -> None:
     """Detect host resources and write optimal scalability settings to .env."""
     sys_info = detect_system()
 
@@ -44,11 +52,14 @@ def tune_cmd(*, profile: str, dry_run: bool) -> None:
     hw_table.add_row("Logical CPU cores", str(sys_info.logical_cores))
     hw_table.add_row("Total RAM", f"{sys_info.total_ram_gb} GB")
     hw_table.add_row("Profile", profile)
+    if profile == "prod":
+        budget = max(1, int(sys_info.physical_cores * resource_pct))
+        hw_table.add_row("Resource budget", f"{int(resource_pct * 100)}% ({budget} cores)")
     console.print(hw_table)
     console.print()
 
     # ── Compute tune profile ─────────────────────────────────
-    tp = calculate_tune_profile(profile, system=sys_info)
+    tp = calculate_tune_profile(profile, system=sys_info, resource_pct=resource_pct)
 
     # ── Display computed values ──────────────────────────────
     svc_table = Table(title="Computed Scalability Settings", title_style="bold cyan")

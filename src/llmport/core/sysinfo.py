@@ -3,6 +3,11 @@
 Uses ``psutil`` to detect host hardware (CPU cores, RAM) and derives
 optimal worker counts, DB pool sizes, and message-queue pool sizes
 for all llm.port services.
+
+The control plane is sized to use only a fraction of the host
+(``DEFAULT_RESOURCE_PCT``, default 25 %) so that the majority of
+CPU and RAM remain available for inference engines (vLLM, etc.)
+and other workloads.
 """
 
 from __future__ import annotations
@@ -11,6 +16,11 @@ import os
 from dataclasses import dataclass, field
 
 import psutil
+
+# ── Resource budget ───────────────────────────────────────────────
+# Percentage of total host resources reserved for the llm.port
+# control plane.  The remainder is left for inference / ML workloads.
+DEFAULT_RESOURCE_PCT: float = 0.25
 
 # ── Service classification ────────────────────────────────────────
 # Heavy services handle high-volume request traffic or CPU-bound work.
@@ -61,6 +71,7 @@ class TuneProfile:
 
     profile: str  # "dev" or "prod"
     system: SystemInfo
+    resource_pct: float = DEFAULT_RESOURCE_PCT
 
     # Per-service worker counts (service name → count).
     workers: dict[str, int] = field(default_factory=dict)
@@ -82,6 +93,11 @@ class TuneProfile:
         },
         repr=False,
     )
+
+    @property
+    def budget_cores(self) -> int:
+        """Number of CPU cores allocated to the control plane."""
+        return max(1, int(self.system.physical_cores * self.resource_pct))
 
     def to_env_dict(self) -> dict[str, str]:
         """Flatten into a dict of ``LLM_PORT_*`` env var → value."""
@@ -112,6 +128,8 @@ class TuneProfile:
 def calculate_tune_profile(
     profile: str = "dev",
     system: SystemInfo | None = None,
+    *,
+    resource_pct: float = DEFAULT_RESOURCE_PCT,
 ) -> TuneProfile:
     """Calculate optimal scalability parameters for *profile*.
 
@@ -123,15 +141,18 @@ def calculate_tune_profile(
     system
         Pre-detected system info.  If ``None``, :func:`detect_system`
         is called automatically.
+    resource_pct
+        Fraction (0.0–1.0) of host CPU to allocate to the control
+        plane.  Only affects the ``"prod"`` profile.  Defaults to
+        :data:`DEFAULT_RESOURCE_PCT` (25 %).
     """
     sys = system or detect_system()
-    cores = sys.physical_cores
-    tp = TuneProfile(profile=profile, system=sys)
+    tp = TuneProfile(profile=profile, system=sys, resource_pct=resource_pct)
 
     if profile == "dev":
         # Dev: keep things light — 1-2 workers, small pools.
         for svc in HEAVY_SERVICES:
-            tp.workers[svc] = min(cores, 2)
+            tp.workers[svc] = min(sys.physical_cores, 2)
         for svc in LIGHT_SERVICES:
             tp.workers[svc] = 1
         for svc in DB_SERVICES:
@@ -141,20 +162,22 @@ def calculate_tune_profile(
             tp.rabbit_pool_size[svc] = 2
             tp.rabbit_channel_pool_size[svc] = 10
     else:
-        # Prod: scale with available CPU cores.
+        # Prod: scale within the CPU budget (resource_pct of total).
+        budget = tp.budget_cores  # e.g. 2 for 8 cores @ 25%
+
         for svc in HEAVY_SERVICES:
-            tp.workers[svc] = min(2 * cores + 1, 17)
+            tp.workers[svc] = max(1, budget)
         for svc in LIGHT_SERVICES:
-            tp.workers[svc] = min(cores + 1, 8)
+            tp.workers[svc] = 1
 
         for svc in DB_SERVICES:
             w = tp.workers[svc]
-            tp.db_pool_size[svc] = min(max(10, w * 5), 50)
+            tp.db_pool_size[svc] = max(5, w * 3)
             tp.db_max_overflow[svc] = tp.db_pool_size[svc]
 
         for svc in RABBIT_SERVICES:
             w = tp.workers[svc]
-            tp.rabbit_pool_size[svc] = min(max(4, w * 2), 20)
+            tp.rabbit_pool_size[svc] = max(2, w)
             tp.rabbit_channel_pool_size[svc] = tp.rabbit_pool_size[svc] * 2
 
     return tp
