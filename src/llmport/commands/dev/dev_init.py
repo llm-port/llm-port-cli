@@ -258,7 +258,7 @@ def _install_frontend_deps(frontend_dir: Path) -> None:
 
 
 def _run_migrations(backend_dir: Path) -> None:
-    """Run Alembic migrations."""
+    """Run Alembic migrations for backend and API gateway."""
     console.print("[cyan]Running database migrations…[/cyan]")
     _ensure_backend_role(backend_dir)
     db_user, db_pass, db_base = _backend_db_creds(backend_dir)
@@ -271,9 +271,19 @@ def _run_migrations(backend_dir: Path) -> None:
     env.setdefault("LLM_PORT_BACKEND_DB_BASE", db_base)
     result = subprocess.run(["uv", "run", "alembic", "upgrade", "head"], cwd=str(backend_dir), env=env)
     if result.returncode != 0:
-        warning("Alembic migration exited with non-zero code.")
+        warning("Backend Alembic migration exited with non-zero code.")
     else:
-        success("Migrations up to date.")
+        success("Backend migrations up to date.")
+
+    # API gateway migrations (creates llm_gateway_request_log, etc.)
+    api_dir = backend_dir.parent / "llm_port_api"
+    if api_dir.exists() and (api_dir / "alembic.ini").exists():
+        console.print("[cyan]Running API gateway migrations…[/cyan]")
+        result = subprocess.run(["uv", "run", "alembic", "upgrade", "head"], cwd=str(api_dir), env=env)
+        if result.returncode != 0:
+            warning("API gateway Alembic migration exited with non-zero code.")
+        else:
+            success("API gateway migrations up to date.")
 
 
 def _generate_vscode_workspace(workspace: Path) -> None:
