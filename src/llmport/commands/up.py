@@ -46,14 +46,13 @@ def up_cmd(
 
     console.print("[bold cyan]Starting llm.port services…[/bold cyan]")
 
-    with console.status("[bold cyan]docker compose up[/bold cyan]"):
-        returncode = compose_up(
-            ctx,
-            detach=detach,
-            build=do_build,
-            pull=pull,
-            services=list(services) if services else None,
-        )
+    returncode = compose_up(
+        ctx,
+        detach=detach,
+        build=do_build,
+        pull=pull,
+        services=list(services) if services else None,
+    )
 
     if returncode == 0:
         success("Services started successfully.")
